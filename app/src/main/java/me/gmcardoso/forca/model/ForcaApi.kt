@@ -7,8 +7,8 @@ import retrofit2.http.Path
 interface ForcaApi {
 
     @GET("identificadores/{id}")
-    fun retrieveIdentificadores(@Path("id") id: Int): Call<Identifier>
+    fun retrieveIdentificadores(@Path("id") id: Int): Call<Array<Int>>
 
     @GET("palavra/{id}")
-    fun retrievePalavra(@Path("id") id: Int): Call<Word>
+    fun retrievePalavra(@Path("id") id: Int): Call<Array<Word>>
 }

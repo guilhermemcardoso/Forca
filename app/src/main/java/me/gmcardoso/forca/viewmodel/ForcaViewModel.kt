@@ -18,18 +18,24 @@ import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.*
+import kotlin.collections.ArrayList
 
 class ForcaViewModel(application: Application): AndroidViewModel(application) {
     val identifiersMld: MutableLiveData<Identifier> = MutableLiveData()
     val wordMld: MutableLiveData<Word> = MutableLiveData()
-    val totalRoundsMdl: MutableLiveData<Int> = MutableLiveData()
     val currentRoundMdl: MutableLiveData<Int> = MutableLiveData()
-    val difficultyMdl: MutableLiveData<Int> = MutableLiveData()
+    val attemptsMdl: MutableLiveData<Int> = MutableLiveData()
+    val gameEndedMdl: MutableLiveData<Boolean> = MutableLiveData()
 
-    var gameIdentifiers: MutableList<Int> = ArrayList()
+    private var correctAnswerCounter: MutableList<String> = mutableListOf()
+    private var wrongAnswerCounter: MutableList<String> = mutableListOf()
+    private var currentDifficulty: Int? = getDifficulty()
+    private var totalRounds: Int? = getRounds()
+    private var gameIdentifiers: MutableList<Int> = ArrayList()
+
 
     companion object {
-        val BASE_URL = "https://nobile.pro.br/forcaws/"
+        val BASE_URL = "https://www.nobile.pro.br/forcaws/"
         val SHARED_PREFERENCES_KEY = "FORCA_SHARED_PREFERENCES_KEY"
         val TOTAL_ROUNDS_KEY = "TOTAL_ROUNDS_KEY"
         val TOTAL_ROUNDS_DEFAULT = 1
@@ -47,19 +53,54 @@ class ForcaViewModel(application: Application): AndroidViewModel(application) {
 
     private val forcaApi: ForcaApi = retrofit.create(ForcaApi::class.java)
 
+    fun guess(key: String) {
+        val word: Word = wordMld.value!!
+        if(word.word.uppercase().contains(key.uppercase())) {
+
+        } else {
+            val attempts: Int = attemptsMdl.value!!
+            attemptsMdl.postValue(attempts - 1)
+        }
+    }
+
     fun startGame() {
-        getTotalRounds()
-        getDifficulty()
-        getIdentifiers(difficultyMdl.value!!)
-        generateRoundIdentifiers()
-        currentRoundMdl.postValue(1)
-        getWord(gameIdentifiers[currentRoundMdl.value!!])
+        currentRoundMdl.postValue(0)
+        getIdentifiers(currentDifficulty!!)
+        correctAnswerCounter = mutableListOf()
+        wrongAnswerCounter = mutableListOf()
+        gameEndedMdl.postValue(false)
+    }
+
+    fun nextRound() {
+        val index = gameIdentifiers[currentRoundMdl.value!!]
+        attemptsMdl.postValue(6)
+        getWord(index)
+        currentRoundMdl.postValue(currentRoundMdl.value!! + 1)
+    }
+
+    fun finishRound(ganhouRound: Boolean) {
+        Log.d("WORD - finishRound() ganhouRound", ganhouRound.toString())
+        if(ganhouRound) {
+            correctAnswerCounter.add(wordMld.value?.word!!)
+
+            Log.d("WORD - finishRound() correctAnswerCounterMdl", correctAnswerCounter.toString())
+        } else {
+            wrongAnswerCounter.add(wordMld.value?.word!!)
+            Log.d("WORD - finishRound() wrongAnswerCounterMdl", wrongAnswerCounter.toString())
+        }
+
+        if(currentRoundMdl.value!! < totalRounds!!) {
+            nextRound()
+        } else {
+            gameEndedMdl.postValue(true)
+        }
+
     }
 
     fun generateRoundIdentifiers() {
         val random = Random()
         gameIdentifiers = ArrayList()
-        while (gameIdentifiers.size < totalRoundsMdl.value!!) {
+        while (gameIdentifiers.size < totalRounds!!) {
             val randomIndex = random.nextInt(identifiersMld.value!!.words.size - 1)
             val randomIdentifier = identifiersMld.value!!.words[randomIndex]
             if(!gameIdentifiers.contains(randomIdentifier)) {
@@ -68,12 +109,20 @@ class ForcaViewModel(application: Application): AndroidViewModel(application) {
         }
     }
 
-    fun getTotalRounds() {
+    fun getCorrectAnswers(): MutableList<String> {
+        return correctAnswerCounter
+    }
+
+    fun getWrongAnswers(): MutableList<String> {
+        return wrongAnswerCounter
+    }
+
+    fun getRounds() : Int? {
 
         val application = getApplication<Application>()
         val sharedPref = application.getSharedPreferences(SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
         val rodadas = sharedPref?.getInt(TOTAL_ROUNDS_KEY, TOTAL_ROUNDS_DEFAULT)
-        totalRoundsMdl.postValue(rodadas)
+        return rodadas
     }
 
     fun setTotalRounds(rodadas: Int) {
@@ -84,15 +133,15 @@ class ForcaViewModel(application: Application): AndroidViewModel(application) {
             apply()
         }
 
-        totalRoundsMdl.postValue(rodadas)
+        totalRounds = rodadas
     }
 
-    fun getDifficulty() {
+    fun getDifficulty() : Int? {
 
         val application = getApplication<Application>()
         val sharedPref = application.getSharedPreferences(SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
         val difficulty = sharedPref?.getInt(DIFFICULTY_KEY, DIFFICULTY_DEFAULT)
-        difficultyMdl.postValue(difficulty)
+        return difficulty
     }
 
     fun setDifficulty(nivel: Int) {
@@ -103,20 +152,22 @@ class ForcaViewModel(application: Application): AndroidViewModel(application) {
             apply()
         }
 
-        difficultyMdl.postValue(nivel)
+        currentDifficulty = nivel
     }
 
     fun getIdentifiers(id: Int) {
         scope.launch {
-            forcaApi.retrieveIdentificadores(id).enqueue(object: Callback<Identifier> {
+            forcaApi.retrieveIdentificadores(id).enqueue(object: Callback<Array<Int>> {
                 override fun onResponse(
-                    call: Call<Identifier>,
-                    response: Response<Identifier>
+                    call: Call<Array<Int>>,
+                    response: Response<Array<Int>>
                 ) {
-                    identifiersMld.postValue(response.body())
+                    val list: Array<Int> = response.body()!!
+                    val identifier = Identifier(list)
+                    identifiersMld.postValue(identifier)
                 }
 
-                override fun onFailure(call: Call<Identifier>, t: Throwable) {
+                override fun onFailure(call: Call<Array<Int>>, t: Throwable) {
                     Log.e("${BASE_URL}", t.message.toString())
                 }
             })
@@ -125,16 +176,17 @@ class ForcaViewModel(application: Application): AndroidViewModel(application) {
 
     fun getWord(id: Int) {
         scope.launch {
-            forcaApi.retrievePalavra(id).enqueue(object: Callback<Word> {
+            forcaApi.retrievePalavra(id).enqueue(object: Callback<Array<Word>> {
                 override fun onResponse(
-                    call: Call<Word>,
-                    response: Response<Word>
+                    call: Call<Array<Word>>,
+                    response: Response<Array<Word>>
                 ) {
-                    wordMld.postValue(response.body())
+                    Log.d("WORD AQUI", response.body()!!.get(0).word)
+                    wordMld.postValue(response.body()!!.get(0))
                 }
 
-                override fun onFailure(call: Call<Word>, t: Throwable) {
-                    Log.e("${BASE_URL}", t.message.toString())
+                override fun onFailure(call: Call<Array<Word>>, t: Throwable) {
+                    Log.e("${BASE_URL}/palavra/${id}", t.message.toString())
                 }
             })
         }

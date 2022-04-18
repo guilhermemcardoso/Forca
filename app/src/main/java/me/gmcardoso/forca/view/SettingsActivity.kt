@@ -24,11 +24,7 @@ class SettingsActivity : AppCompatActivity() {
             .AndroidViewModelFactory(this.application)
             .create(ForcaViewModel::class.java)
 
-        observeTotalRounds()
-        observeDifficulty()
-
-        forcaViewModel.getDifficulty()
-        forcaViewModel.getTotalRounds()
+        getInitialValues()
 
         activitySettingsBinding.closeBtn.setOnClickListener {
             finish()
@@ -37,6 +33,10 @@ class SettingsActivity : AppCompatActivity() {
         activitySettingsBinding.difficultySb.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(p0: SeekBar?, value: Int, p2: Boolean) {
                 forcaViewModel.setDifficulty(value)
+                runOnUiThread {
+                    activitySettingsBinding.difficultyLabelTv.text = "Dificuldade: ${value}"
+                    activitySettingsBinding.difficultySb.progress = value
+                }
             }
 
             override fun onStartTrackingTouch(p0: SeekBar?) {
@@ -51,6 +51,10 @@ class SettingsActivity : AppCompatActivity() {
         activitySettingsBinding.roundsSb.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(p0: SeekBar?, value: Int, p2: Boolean) {
                 forcaViewModel.setTotalRounds(value)
+                runOnUiThread {
+                    activitySettingsBinding.roundsLabelTv.text = "Rodadas: ${value}"
+                    activitySettingsBinding.roundsSb.progress = value
+                }
             }
 
             override fun onStartTrackingTouch(p0: SeekBar?) {
@@ -63,21 +67,15 @@ class SettingsActivity : AppCompatActivity() {
         })
     }
 
-    fun observeTotalRounds() {
-        forcaViewModel.totalRoundsMdl.observe(this) { totalRounds ->
-            runOnUiThread {
-                activitySettingsBinding.roundsLabelTv.text = "Rodadas: ${totalRounds}"
-                activitySettingsBinding.roundsSb.progress = totalRounds
-            }
-        }
-    }
+    fun getInitialValues() {
+        val initialDifficulty = forcaViewModel.getDifficulty()
+        val initialRounds = forcaViewModel.getRounds()
 
-    fun observeDifficulty() {
-        forcaViewModel.difficultyMdl.observe(this) { difficulty ->
-            runOnUiThread {
-                activitySettingsBinding.difficultyLabelTv.text = "Dificuldade: ${difficulty}"
-                activitySettingsBinding.difficultySb.progress = difficulty
-            }
-        }
+        activitySettingsBinding.roundsLabelTv.text = "Rodadas: ${initialRounds}"
+        activitySettingsBinding.roundsSb.progress = initialRounds!!
+
+        activitySettingsBinding.difficultyLabelTv.text = "Dificuldade: ${initialDifficulty}"
+        activitySettingsBinding.difficultySb.progress = initialDifficulty!!
+
     }
 }

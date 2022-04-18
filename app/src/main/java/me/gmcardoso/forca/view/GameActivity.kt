@@ -1,11 +1,15 @@
 package me.gmcardoso.forca.view
 
+import android.content.Intent
+import android.graphics.Paint
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.util.Log
+import android.view.View
+import android.widget.Toast
 import androidx.lifecycle.ViewModelProvider
 import me.gmcardoso.forca.databinding.ActivityGameBinding
 import me.gmcardoso.forca.viewmodel.ForcaViewModel
+import java.util.ArrayList
 
 class GameActivity : AppCompatActivity() {
 
@@ -13,7 +17,9 @@ class GameActivity : AppCompatActivity() {
         ActivityGameBinding.inflate(layoutInflater)
     }
 
-    var keyboardEnabled = false
+    private var keyboardEnabled = false
+    private var word: String = ""
+    private var ganhouRound = false
 
     private lateinit var forcaViewModel: ForcaViewModel
 
@@ -27,29 +33,95 @@ class GameActivity : AppCompatActivity() {
 
         addKeyboardListeners()
 
+        activityGameBinding.nextBtn.setOnClickListener {
+            forcaViewModel.finishRound(ganhouRound)
+        }
+
         startGame()
         observeWord()
-        observeTotalRounds()
+        observeIdentifiers()
+        getTotalRounds()
         observeCurrentRound()
+        observeAttempts()
+        observeGameEnded()
     }
 
     fun startGame() {
-        //forcaViewModel.startGame()
-        keyboardEnabled = true
+        forcaViewModel.startGame()
+    }
+
+    fun guess(key: String) {
+        forcaViewModel.guess(key)
+        val stringBuilder = StringBuilder()
+        stringBuilder.append(activityGameBinding.letrasTv.text)
+        if(activityGameBinding.letrasTv.text.length > 0) {
+            stringBuilder.append(" - ")
+        }
+        stringBuilder.append(key)
+
+
+
+        if(word.uppercase().contains(key.uppercase())) {
+            Toast.makeText(this, "Alternativa correta", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Alternativa incorreta", Toast.LENGTH_SHORT).show()
+        }
+
+        for(index in 0 until word.length) {
+            var guessingWord = activityGameBinding.palavraTv.text.toString()
+            if(word[index].toString().uppercase() == key.uppercase()) {
+                var before = " "
+                var after = ""
+                if(index > 0) {
+                    before = guessingWord.substring(0, index * 2 + 1)
+                }
+                if(index < word.length - 1) {
+                    after = guessingWord.substring((index + 1) * 2)
+                }
+
+                activityGameBinding.palavraTv.text = "${before}${key}${after}"
+                if(!activityGameBinding.palavraTv.text.contains("_")) {
+                    activityGameBinding.botoesLL.visibility = View.VISIBLE
+                    activityGameBinding.tecladoCl.visibility = View.GONE
+                    ganhouRound = true
+                    Toast.makeText(this, "Você ganhou esta rodada", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        activityGameBinding.letrasTv.text = stringBuilder.toString()
     }
 
     fun observeWord() {
-        forcaViewModel.wordMld.observe(this) { word ->
+        forcaViewModel.wordMld.observe(this) { updatedWord ->
+            keyboardEnabled = true
+            word = updatedWord.word
+            val stringBuilder = StringBuilder()
 
+            for(index in 0 until updatedWord.letters) {
+                stringBuilder.append(" _")
+            }
+            runOnUiThread {
+                activityGameBinding.palavraTv.text = stringBuilder.toString()
+                activityGameBinding.letrasTv.text = ""
+                activityGameBinding.botoesLL.visibility = View.GONE
+                activityGameBinding.tecladoCl.visibility = View.VISIBLE
+                ganhouRound = false
+                enabledAllKeyboardKeys()
+            }
         }
     }
 
-    fun observeTotalRounds() {
-        forcaViewModel.totalRoundsMdl.observe(this) { totalRounds ->
-            runOnUiThread {
-                activityGameBinding.totalRodadasTv.text = totalRounds.toString()
-            }
+    fun observeIdentifiers() {
+        forcaViewModel.identifiersMld.observe(this) {identifiers ->
+            forcaViewModel.generateRoundIdentifiers()
+            forcaViewModel.nextRound()
         }
+    }
+
+    fun getTotalRounds() {
+        val total = forcaViewModel.getRounds()
+        activityGameBinding.totalRodadasTv.text = total.toString()
     }
 
     fun observeCurrentRound() {
@@ -57,6 +129,49 @@ class GameActivity : AppCompatActivity() {
             runOnUiThread {
                 activityGameBinding.rodadaAtualTv.text = "Rodada $currentRound de "
             }
+        }
+    }
+
+    fun observeAttempts() {
+        forcaViewModel.attemptsMdl.observe(this) {attempts ->
+            updateAttempts(attempts)
+        }
+    }
+
+    fun updateAttempts(remainingAttempts: Int) {
+
+        activityGameBinding.cabecaTv.paintFlags = 0
+        activityGameBinding.troncoTv.paintFlags = 0
+        activityGameBinding.bracoDireitoTv.paintFlags = 0
+        activityGameBinding.bracoEsquerdoTv.paintFlags = 0
+        activityGameBinding.pernaDireitaTv.paintFlags = 0
+        activityGameBinding.pernaEsquerdaTv.paintFlags = 0
+
+        if(remainingAttempts < 6) {
+            activityGameBinding.cabecaTv.paintFlags = Paint.STRIKE_THRU_TEXT_FLAG
+        }
+
+        if(remainingAttempts < 5) {
+            activityGameBinding.troncoTv.paintFlags = Paint.STRIKE_THRU_TEXT_FLAG
+        }
+
+        if(remainingAttempts < 4) {
+            activityGameBinding.bracoDireitoTv.paintFlags = Paint.STRIKE_THRU_TEXT_FLAG
+        }
+
+        if(remainingAttempts < 3) {
+            activityGameBinding.bracoEsquerdoTv.paintFlags = Paint.STRIKE_THRU_TEXT_FLAG
+        }
+
+        if(remainingAttempts < 2) {
+            activityGameBinding.pernaDireitaTv.paintFlags = Paint.STRIKE_THRU_TEXT_FLAG
+        }
+
+        if(remainingAttempts < 1) {
+            activityGameBinding.pernaEsquerdaTv.paintFlags = Paint.STRIKE_THRU_TEXT_FLAG
+            activityGameBinding.botoesLL.visibility = View.VISIBLE
+            activityGameBinding.tecladoCl.visibility = View.GONE
+            Toast.makeText(this, "Você perdeu esta rodada", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -157,7 +272,23 @@ class GameActivity : AppCompatActivity() {
 
     fun pressKey(key: String) {
         if(keyboardEnabled) {
-            Log.d("PRESS", key)
+            disableKey(key)
+            guess(key)
+        }
+    }
+
+    fun observeGameEnded() {
+        forcaViewModel.gameEndedMdl.observe(this) { gameEnded ->
+            if(gameEnded) {
+                val intent = Intent(this, ResultActivity::class.java)
+                val wrongAnswers = forcaViewModel.getWrongAnswers()
+                val correctAnswers = forcaViewModel.getCorrectAnswers()
+
+                intent.putStringArrayListExtra("correctAnswers", ArrayList(correctAnswers))
+                intent.putStringArrayListExtra("wrongAnswers", ArrayList(wrongAnswers))
+                startActivity(intent)
+                finish()
+            }
         }
     }
 }
