@@ -1,5 +1,6 @@
 package me.gmcardoso.forca.view
 
+import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
@@ -20,8 +21,30 @@ class ResultActivity : AppCompatActivity() {
 
         val correctAnswers = intent.getStringArrayListExtra("correctAnswers")
         val wrongAnswers = intent.getStringArrayListExtra("wrongAnswers")
-        Log.d("WORD - correctAnswers", correctAnswers?.size.toString())
-        Log.d("WORD - wrongAnswers", wrongAnswers?.size.toString())
+
+        val acertosStringBuffer = StringBuffer()
+        for(index in 0 until (correctAnswers?.size ?: 0)) {
+            acertosStringBuffer.append("- " + (correctAnswers?.get(index) ?: "") + "\n")
+        }
+
+        val errosStringBuffer = StringBuffer()
+        for(index in 0 until (wrongAnswers?.size ?: 0)) {
+            errosStringBuffer.append("- " + (wrongAnswers?.get(index) ?: "") + "\n")
+        }
+
+        activityResultBinding.acertosLabelTv.text = "${correctAnswers?.size} acertos:"
+        activityResultBinding.errosLabelTv.text = "${wrongAnswers?.size} erros:"
+        activityResultBinding.totalPalavrasTv.text = "${(correctAnswers?.size ?: 0) + (wrongAnswers?.size ?: 0)} palavras"
+        activityResultBinding.acertosTv.text = acertosStringBuffer.toString()
+        activityResultBinding.errosTv.text = errosStringBuffer.toString()
+        activityResultBinding.backBtn.setOnClickListener {
+            finish()
+        }
+        activityResultBinding.nextBtn.setOnClickListener {
+            val intent = Intent(this, GameActivity::class.java)
+            startActivity(intent)
+            finish()
+        }
 
     }
 }

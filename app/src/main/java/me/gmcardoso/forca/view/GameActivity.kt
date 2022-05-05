@@ -2,14 +2,14 @@ package me.gmcardoso.forca.view
 
 import android.content.Intent
 import android.graphics.Paint
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
 import me.gmcardoso.forca.databinding.ActivityGameBinding
 import me.gmcardoso.forca.viewmodel.ForcaViewModel
-import java.util.ArrayList
+import java.text.Normalizer
 
 class GameActivity : AppCompatActivity() {
 
@@ -50,6 +50,12 @@ class GameActivity : AppCompatActivity() {
         forcaViewModel.startGame()
     }
 
+    fun CharSequence.unaccent(): String {
+        val REGEX_UNACCENT = "\\p{InCombiningDiacriticalMarks}+".toRegex()
+        val temp = Normalizer.normalize(this, Normalizer.Form.NFD)
+        return REGEX_UNACCENT.replace(temp, "")
+    }
+
     fun guess(key: String) {
         forcaViewModel.guess(key)
         val stringBuilder = StringBuilder()
@@ -69,7 +75,7 @@ class GameActivity : AppCompatActivity() {
 
         for(index in 0 until word.length) {
             var guessingWord = activityGameBinding.palavraTv.text.toString()
-            if(word[index].toString().uppercase() == key.uppercase()) {
+            if(word[index].toString().unaccent().uppercase() == key.uppercase()) {
                 var before = " "
                 var after = ""
                 if(index > 0) {
@@ -128,6 +134,12 @@ class GameActivity : AppCompatActivity() {
         forcaViewModel.currentRoundMdl.observe(this) { currentRound ->
             runOnUiThread {
                 activityGameBinding.rodadaAtualTv.text = "Rodada $currentRound de "
+                val total = activityGameBinding.totalRodadasTv.text.toString().toInt()
+                if(currentRound < total) {
+                    activityGameBinding.nextBtn.text = "Próxima rodada"
+                } else {
+                    activityGameBinding.nextBtn.text = "Ver resultados"
+                }
             }
         }
     }

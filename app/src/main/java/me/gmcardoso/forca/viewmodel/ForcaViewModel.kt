@@ -17,6 +17,7 @@ import retrofit2.Callback
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.text.Normalizer
 import java.util.*
 import kotlin.collections.ArrayList
 
@@ -53,9 +54,15 @@ class ForcaViewModel(application: Application): AndroidViewModel(application) {
 
     private val forcaApi: ForcaApi = retrofit.create(ForcaApi::class.java)
 
+    fun CharSequence.unaccent(): String {
+        val REGEX_UNACCENT = "\\p{InCombiningDiacriticalMarks}+".toRegex()
+        val temp = Normalizer.normalize(this, Normalizer.Form.NFD)
+        return REGEX_UNACCENT.replace(temp, "")
+    }
+
     fun guess(key: String) {
         val word: Word = wordMld.value!!
-        if(word.word.uppercase().contains(key.uppercase())) {
+        if(word.word.unaccent().uppercase().contains(key.uppercase())) {
 
         } else {
             val attempts: Int = attemptsMdl.value!!
